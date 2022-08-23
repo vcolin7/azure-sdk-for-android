@@ -13,7 +13,9 @@ import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * The retry strategy with full jitter backoff.
+ * A truncated exponential backoff implementation of {@link RetryStrategy} that has a delay duration that exponentially
+ * increases with each retry attempt until an upper bound is reached after which every retry attempt is delayed by the
+ * provided max delay duration.
  */
 public final class ExponentialBackoff implements RetryStrategy {
     private final ClientLogger logger = new ClientLogger(ExponentialBackoff.class);
@@ -83,7 +85,7 @@ public final class ExponentialBackoff implements RetryStrategy {
     }
 
     @Override
-    public Duration calculateRetryDelay(HttpResponse response, Throwable error, int retryAttempts) {
+    public Duration calculateRetryDelay(int retryAttempts) {
         final long delayWithJitterInNanos;
         final long origin = (long) (baseDelay.toNanos() * (1 - JITTER_FACTOR));
         final long bound = (long) (baseDelay.toNanos() * (1 + JITTER_FACTOR));
@@ -94,26 +96,28 @@ public final class ExponentialBackoff implements RetryStrategy {
             // https://developer.android.com/reference/java/util/Random#longs(long,%20long)
             long r = RANDOM.nextLong();
             long n = bound - origin, m = n - 1;
+
             if ((n & m) == 0L) {
                 r = (r & m) + origin;
             } else if (n > 0L) {
                 long u = r >>> 1;
                 r = u % n;
+
                 while (u + m - r < 0L) {
                     u = RANDOM.nextLong() >>> 1;
                     r = u % n;
                 }
+
                 r += origin;
             } else {
                 while (r < origin || r >= bound) {
                     r = RANDOM.nextLong();
                 }
             }
+
             delayWithJitterInNanos = r;
         }
 
-        Duration delay = Duration.ofNanos(Math.min((1 << retryAttempts) * delayWithJitterInNanos,
-            maxDelay.toNanos()));
-        return delay;
+        return Duration.ofNanos(Math.min((1L << retryAttempts) * delayWithJitterInNanos, maxDelay.toNanos()));
     }
 }

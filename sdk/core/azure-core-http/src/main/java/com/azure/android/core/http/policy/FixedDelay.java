@@ -19,11 +19,12 @@ public class FixedDelay implements RetryStrategy {
     private final Duration delay;
 
     /**
-     * Creates {@link FixedDelay} retry strategy.
+     * Creates an instance of {@link FixedDelay}.
      *
-     * @param maxRetries The maximum number of times to retry.
-     * @param delay The fixed backoff delay applied before every retry.
-     * @throws IllegalArgumentException if {@code maxRetries} is less than 0.
+     * @param maxRetries The max number of retry attempts that can be made.
+     * @param delay The fixed delay duration between retry attempts.
+     * @throws IllegalArgumentException If {@code maxRetries} is negative.
+     * @throws NullPointerException If {@code delay} is {@code null}.
      */
     public FixedDelay(int maxRetries, Duration delay) {
         if (maxRetries < 0) {
@@ -39,7 +40,7 @@ public class FixedDelay implements RetryStrategy {
     }
 
     @Override
-    public Duration calculateRetryDelay(HttpResponse response, Throwable error, int retryAttempts) {
+    public Duration calculateRetryDelay(int retryAttempts) {
         return this.delay;
     }
 }

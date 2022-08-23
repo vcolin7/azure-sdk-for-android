@@ -7,50 +7,59 @@ import com.azure.android.core.http.HttpResponse;
 
 import org.threeten.bp.Duration;
 
-import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.util.concurrent.TimeoutException;
 
 /**
  * The interface for determining the retry strategy used in {@link RetryPolicy}.
  */
 public interface RetryStrategy {
     /**
-     * Get the maximum number of times to retry.
+     * HTTP response status code for {@code Too Many Requests}.
+     */
+    int HTTP_STATUS_TOO_MANY_REQUESTS = 429;
+
+    /**
+     * Max number of retry attempts to be made.
      *
-     * @return The maximum number of times to retry.
+     * @return The max number of retry attempts.
      */
     int getMaxRetries();
 
     /**
-     * Determines any retry should be performed.
+     * Computes the delay between each retry.
      *
-     * @param response The HTTP response.
-     * @param error The pipeline exception, if any.
-     * @param retryAttempts The number of retry attempts so far made.
+     * @param retryAttempts The number of retry attempts completed so far.
+     *
+     * @return The delay duration before the next retry.
+     */
+    Duration calculateRetryDelay(int retryAttempts);
+
+    /**
+     * This method is consulted to determine if a retry attempt should be made for the given {@link HttpResponse} if the
+     * retry attempts are less than {@link #getMaxRetries()}.
+     *
+     * @param httpResponse The HTTP response.
+     *
      * @return True to retry, false to exit retry loop.
      */
-    default boolean shouldRetry(HttpResponse response, Throwable error, int retryAttempts) {
-        if (error != null) {
-            return error instanceof IOException
-                || error instanceof TimeoutException;
-        } else {
-            final int code = response.getStatusCode();
-            return (code == HttpURLConnection.HTTP_CLIENT_TIMEOUT
-                || code == 429 // to-many requests
-                || (code >= HttpURLConnection.HTTP_INTERNAL_ERROR
-                && code != HttpURLConnection.HTTP_NOT_IMPLEMENTED
-                && code != HttpURLConnection.HTTP_VERSION));
-        }
+    default boolean shouldRetry(HttpResponse httpResponse) {
+        int code = httpResponse.getStatusCode();
+        return (code == HttpURLConnection.HTTP_CLIENT_TIMEOUT
+            || code == HTTP_STATUS_TOO_MANY_REQUESTS // HttpUrlConnection does not define HTTP status 429
+            || (code >= HttpURLConnection.HTTP_INTERNAL_ERROR
+            && code != HttpURLConnection.HTTP_NOT_IMPLEMENTED
+            && code != HttpURLConnection.HTTP_VERSION));
     }
 
     /**
-     * Determines the delay duration that should be waited before retrying.
+     * This method is consulted to determine if a retry attempt should be made for the given {@link Throwable}
+     * propagated when the request failed to send.
      *
-     * @param response The HTTP response.
-     * @param error The pipeline exception, if any.
-     * @param retryAttempts The number of retry attempts so far made.
-     * @return The delay duration.
+     * @param throwable The {@link Throwable} thrown during the previous attempt.
+     *
+     * @return Whether a retry should be attempted.
      */
-    Duration calculateRetryDelay(HttpResponse response, Throwable error, int retryAttempts);
+    default boolean shouldRetryException(Throwable throwable) {
+        return throwable instanceof Exception;
+    }
 }
