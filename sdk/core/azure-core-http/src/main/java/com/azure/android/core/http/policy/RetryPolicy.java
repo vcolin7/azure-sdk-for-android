@@ -12,14 +12,17 @@ import com.azure.android.core.http.HttpResponse;
 import com.azure.android.core.http.NextPolicyCallback;
 import com.azure.android.core.http.PolicyCompleter;
 import com.azure.android.core.http.implementation.Util;
+import com.azure.android.core.logging.ClientLogger;
 import com.azure.android.core.util.Supplier;
 
 import org.threeten.bp.Duration;
 import org.threeten.bp.OffsetDateTime;
-import org.threeten.bp.format.DateTimeFormatter;
 import org.threeten.bp.temporal.ChronoUnit;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
@@ -27,6 +30,20 @@ import java.util.concurrent.TimeUnit;
  * A pipeline policy that retries when a recoverable HTTP error or exception occurs.
  */
 public class RetryPolicy implements HttpPipelinePolicy {
+    // RetryPolicy is a commonly used policy, use a static logger.
+    private static final ClientLogger LOGGER = new ClientLogger(RetryPolicy.class);
+    private static final String LINE_SEPARATOR;
+
+    static {
+        final String lineSeparator = System.getProperty("line.separator");
+
+        if (lineSeparator == null || lineSeparator.length() == 0) {
+            LINE_SEPARATOR = lineSeparator;
+        } else {
+            LINE_SEPARATOR = "\n";
+        }
+    }
+
     private final RetryStrategy retryStrategy;
     private final String retryAfterHeader;
     private final ChronoUnit retryAfterTimeUnit;
@@ -84,6 +101,7 @@ public class RetryPolicy implements HttpPipelinePolicy {
      * Creates a {@link RetryPolicy} with the provided {@link RetryStrategy}.
      *
      * @param retryStrategy The {@link RetryStrategy} used for retries.
+     *
      * @throws NullPointerException If {@code retryStrategy} is null.
      */
     public RetryPolicy(RetryStrategy retryStrategy) {
@@ -151,13 +169,13 @@ public class RetryPolicy implements HttpPipelinePolicy {
 
             @Override
             public PolicyCompleter.CompletionState onError(Throwable error, PolicyCompleter completer) {
-                return retryIfRequired(chain, null, error, completer, 0);
+                return retryIfRequired(chain, null, Collections.singletonList(error), completer, 0);
             }
         });
     }
 
     private PolicyCompleter.CompletionState retryIfRequired(HttpPipelinePolicyChain chain, HttpResponse response,
-                                                            Throwable error, PolicyCompleter completer,
+                                                            List<Throwable> suppressed, PolicyCompleter completer,
                                                             final int retryAttempts) {
         if (chain.getCancellationToken().isCancellationRequested()) {
             if (response != null) {
@@ -167,96 +185,73 @@ public class RetryPolicy implements HttpPipelinePolicy {
             return completer.completedError(new IOException("Canceled."));
         }
 
-        if (!shouldRetry(response, retryAttempts)) {
-            if (response != null) {
-                return completer.completed(response);
-            } else {
-                if (retryAttempts >= this.retryStrategy.getMaxRetries()) {
-                    final RuntimeException maxRetriedError = new RuntimeException(String.format(Locale.getDefault(),
-                        "The max retries (%d times) for the service call is exceeded.",
-                        this.retryStrategy.getMaxRetries()));
-                    if (error != null) {
-                        maxRetriedError.addSuppressed(error);
-                    }
+        if (response == null && suppressed != null) {
+            Throwable throwable = suppressed.get(suppressed.size() - 1);
 
-                    return completer.completedError(maxRetriedError);
-                } else {
-                    return completer.completedError(error);
-                }
-            }
-        } else {
-            Duration delay = null;
-            Throwable userError = null;
+            if (shouldRetryException(throwable, retryAttempts)) {
+                logRetryWithError(false, retryAttempts, throwable);
 
-            try {
-                delay = calculateRetryDelay(response, null, retryAttempts);
-            } catch (Throwable e) {
-                userError = e;
-            } finally {
-                if (response != null) {
-                    response.close();
-                }
-            }
-
-            if (userError != null) {
-                return completer.completedError(userError);
-            } else {
                 chain.processNextPolicy(chain.getRequest(), new NextPolicyCallback() {
                     @Override
                     public PolicyCompleter.CompletionState onSuccess(HttpResponse response, PolicyCompleter completer) {
-                        return retryIfRequired(chain, response, null, completer, retryAttempts + 1);
+                        return retryIfRequired(chain, response, suppressed, completer, retryAttempts + 1);
                     }
 
                     @Override
                     public PolicyCompleter.CompletionState onError(Throwable error, PolicyCompleter completer) {
-                        return retryIfRequired(chain, null, error, completer, retryAttempts + 1);
+                        suppressed.add(error);
+
+                        return retryIfRequired(chain, null, suppressed, completer, retryAttempts + 1);
                     }
-                }, delay.toMillis(), TimeUnit.MILLISECONDS);
+                });
 
                 return completer.defer();
+            } else {
+                logRetryWithError(true, retryAttempts, throwable);
+
+                for (Throwable suppressedThrowable : suppressed) {
+                    throwable.addSuppressed(suppressedThrowable);
+                }
+
+                throw new RuntimeException(throwable);
             }
         }
-    }
 
-    /**
-     * Determines the delay duration that should be waited before retrying.
-     *
-     * @param response The HTTP response.
-     * @param exception The pipeline exception, if any.
-     * @param retryAttempts The number of retry attempts so far made.
-     *
-     * @return The delay duration.
-     */
-    public Duration calculateRetryDelay(HttpResponse response, Throwable exception, int retryAttempts) {
-        if (exception == null) {
-            final int code = response.getStatusCode();
+        if (shouldRetry(response, retryAttempts)) {
+            final Duration delayDuration =
+                determineDelayDuration(response, retryAttempts, retryStrategy, retryAfterHeader, retryAfterTimeUnit);
 
-            if (code == 429) {
-                // Too Many Requests.
-                // https://docs.microsoft.com/en-us/rest/api/cosmos-db/common-cosmosdb-rest-response-headers
-                final String retryAfterHeader = response.getHeaderValue("x-ms-retry-after-ms");
-                if (retryAfterHeader != null) {
-                    return Duration.of(Integer.parseInt(retryAfterHeader), ChronoUnit.MILLIS);
-                }
+            logRetry(retryAttempts, delayDuration);
+
+            if (response != null) {
+                response.close();
             }
 
-            if (code == 429 || code == 503) {
-                // Too Many Requests OR Service Unavailable
-                // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-                final String retryAfterHeader = response.getHeaderValue("Retry-After");
-                if (retryAfterHeader != null) {
-                    try {
-                        return Duration.between(OffsetDateTime.now(),
-                            OffsetDateTime.parse(retryAfterHeader, DateTimeFormatter.RFC_1123_DATE_TIME));
-                    } catch (Exception ignored) {
-                        return Duration.of(Integer.parseInt(retryAfterHeader), ChronoUnit.SECONDS);
-                    }
+            chain.processNextPolicy(chain.getRequest(), new NextPolicyCallback() {
+                @Override
+                public PolicyCompleter.CompletionState onSuccess(HttpResponse response, PolicyCompleter completer) {
+                    return retryIfRequired(chain, response, suppressed, completer, retryAttempts + 1);
                 }
+
+                @Override
+                public PolicyCompleter.CompletionState onError(Throwable error, PolicyCompleter completer) {
+                    List<Throwable> suppressedLocal = suppressed == null ? new LinkedList<>() : suppressed;
+
+                    suppressedLocal.add(error);
+
+                    return retryIfRequired(chain, null, suppressed, completer,
+                        retryAttempts + 1);
+                }
+            }, delayDuration.toMillis(), TimeUnit.MILLISECONDS);
+
+            return completer.defer();
+        } else {
+            if (retryAttempts >= this.retryStrategy.getMaxRetries()) {
+                logRetryExhausted(retryAttempts);
             }
 
+            return completer.completed(response);
         }
-
-        return this.retryStrategy.calculateRetryDelay(retryAttempts);
     }
 
     /**
@@ -275,17 +270,42 @@ public class RetryPolicy implements HttpPipelinePolicy {
         return tryCount < retryStrategy.getMaxRetries() && retryStrategy.shouldRetryException(throwable);
     }
 
+    private void logRetry(int retryAttempts, Duration delayDuration) {
+        LOGGER.verbose(String.format(Locale.getDefault(),
+            "Retrying. Retry attempts: %d. Delay duration: %d", retryAttempts, delayDuration.toMillis()));
+    }
+
+    private void logRetryExhausted(int retryAttempts) {
+        LOGGER.info(String.format(
+            Locale.getDefault(), "Retry attempts have been exhausted. Retry attempts: %d", retryAttempts));
+    }
+
+    private void logRetryWithError(boolean retriesExhausted, int retryAttempts, Throwable throwable) {
+        if (retriesExhausted) {
+            LOGGER.error(String.format(Locale.getDefault(),
+                "Retry attempts have been exhausted. Retry attempts: %d.%s%s",
+                retryAttempts, LINE_SEPARATOR, throwable.getMessage()), throwable);
+        } else {
+            LOGGER.verbose(String.format(Locale.getDefault(), "Error resume. Retry attempts: %d.%s%s",
+                retryAttempts, LINE_SEPARATOR, throwable.getMessage()), throwable);
+        }
+    }
+
     /*
      * Determines the delay duration that should be waited before retrying.
      */
     static Duration determineDelayDuration(HttpResponse response, int tryCount, RetryStrategy retryStrategy,
                                            String retryAfterHeader, ChronoUnit retryAfterTimeUnit) {
-        // If the retry after header hasn't been configured, attempt to look up the well-known headers.
-        if (isNullOrEmpty(retryAfterHeader)) {
-            return getWellKnownRetryDelay(response.getHeaders(), tryCount, retryStrategy, OffsetDateTime::now);
-        }
+        String retryHeaderValue = null;
 
-        String retryHeaderValue = response.getHeaderValue(retryAfterHeader);
+        if (response != null) {
+            // If the retry after header hasn't been configured, attempt to look up the well-known headers.
+            if (isNullOrEmpty(retryAfterHeader)) {
+                return getWellKnownRetryDelay(response.getHeaders(), tryCount, retryStrategy, OffsetDateTime::now);
+            }
+
+            retryHeaderValue = response.getHeaderValue(retryAfterHeader);
+        }
 
         // Retry header is missing or empty, return the default delay duration.
         if (isNullOrEmpty(retryHeaderValue)) {
