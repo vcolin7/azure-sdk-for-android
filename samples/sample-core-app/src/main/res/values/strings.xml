@@ -2,5 +2,8 @@
     <string name="app_name">sample-core-app</string>
     <string name="send_message">Send Message</string>
   <string name="receive_message">Receive Message</string>
+  <string name="add_message_sent_handler">Add Message Sent Handler</string>
   <string name="remove_message_sent_handler">Remove Message Sent Handler</string>
+  <string name="add_message_received_handler">Add Message Received Handler</string>
+  <string name="remove_message_received_handler">Remove Message Received Handler</string>
 </resources>

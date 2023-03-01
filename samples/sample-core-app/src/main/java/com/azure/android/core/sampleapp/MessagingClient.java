@@ -6,14 +6,20 @@ package com.azure.android.core.sampleapp;
 import com.azure.android.core.util.events.EventHandler;
 import com.azure.android.core.util.events.EventHandlerCollection;
 
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
 public class MessagingClient {
     static final String MESSAGE_RECEIVED = "MessageReceived";
     static final String MESSAGE_SENT = "MessageSent";
 
+    private final List<Message> sentMessages;
+
     public static class MessageSentEvent {
         private String messageId;
         private String userId;
-        private String timestamp;
+        private Date timestamp;
 
         public String getMessageId() {
             return messageId;
@@ -35,11 +41,11 @@ public class MessagingClient {
             return this;
         }
 
-        public String getTimestamp() {
+        public Date getTimestamp() {
             return timestamp;
         }
 
-        public MessageSentEvent setTimestamp(String timestamp) {
+        public MessageSentEvent setTimestamp(Date timestamp) {
             this.timestamp = timestamp;
 
             return this;
@@ -49,7 +55,7 @@ public class MessagingClient {
     public static class MessageReceivedEvent {
         private String messageId;
         private String userId;
-        private String timestamp;
+        private Date timestamp;
         private String contents;
 
         public String getMessageId() {
@@ -72,11 +78,11 @@ public class MessagingClient {
             return this;
         }
 
-        public String getTimestamp() {
+        public Date getTimestamp() {
             return timestamp;
         }
 
-        public MessageReceivedEvent setTimestamp(String timestamp) {
+        public MessageReceivedEvent setTimestamp(Date timestamp) {
             this.timestamp = timestamp;
 
             return this;
@@ -96,7 +102,8 @@ public class MessagingClient {
     public final EventHandlerCollection eventHandlerCollection;
 
     public MessagingClient() {
-        eventHandlerCollection = new EventHandlerCollection();
+        this.eventHandlerCollection = new EventHandlerCollection();
+        this.sentMessages = new ArrayList<>();
     }
 
     public void addOnMessageSentEventHandler(EventHandler<MessageSentEvent> handler) {
@@ -115,22 +122,26 @@ public class MessagingClient {
         eventHandlerCollection.removeEventHandler(MESSAGE_RECEIVED, handler);
     }
 
-    public void sendMessage() {
+    public void sendMessage(Message message) {
+        sentMessages.add(message.setTimestamp(new Date())); // Sending message
+
         MessageSentEvent someEvent = new MessageSentEvent()
-            .setMessageId("sentMessageId")
-            .setTimestamp("912831203")
-            .setUserId("myUser");
+            .setMessageId(message.getId())
+            .setTimestamp(message.getTimestamp())
+            .setUserId(message.getUserId());
 
         eventHandlerCollection.fireEvent(MESSAGE_SENT, someEvent);
     }
 
-    public void receiveMessage() {
-        MessageReceivedEvent someEvent = new MessageReceivedEvent()
-            .setMessageId("sentMessageId")
-            .setTimestamp("912831203")
-            .setUserId("myUser")
-            .setContents("my contents");
+    public void receiveMessages() {
+        for (Message message : sentMessages) {
+            MessageReceivedEvent messageReceivedEvent = new MessageReceivedEvent()
+                .setMessageId(message.getId())
+                .setTimestamp(message.getTimestamp())
+                .setUserId(message.getUserId())
+                .setContents(message.getContents());
 
-        eventHandlerCollection.fireEvent(MESSAGE_RECEIVED, someEvent);
+            eventHandlerCollection.fireEvent(MESSAGE_RECEIVED, messageReceivedEvent);
+        }
     }
 }

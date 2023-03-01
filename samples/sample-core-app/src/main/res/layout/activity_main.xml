@@ -18,6 +18,14 @@
       tools:context="com.azure.android.core.sampleapp.MainActivity"
       tools:showIn="@layout/activity_main">
 
+    <EditText
+        android:id="@+id/editText1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ems="10"
+        android:inputType="textPersonName"
+        android:text="Message" />
+
     <Button
         android:id="@+id/button1"
         android:layout_width="match_parent"
@@ -31,7 +39,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:onClick="receiveMessage"
+        android:onClick="receiveMessages"
         android:text="@string/receive_message" />
 
     <Button
@@ -39,8 +47,32 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:onClick="removeMessageSentEventHandler"
+        android:onClick="addOnMessageSentEventHandler"
+        android:text="@string/add_message_sent_handler" />
+
+    <Button
+        android:id="@+id/button4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:onClick="removeOnMessageSentEventHandler"
         android:text="@string/remove_message_sent_handler" />
+
+    <Button
+        android:id="@+id/button5"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:onClick="addOnMessageReceivedEventHandler"
+        android:text="@string/add_message_received_handler" />
+
+    <Button
+        android:id="@+id/button6"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:onClick="removeOnMessageReceivedEventHandler"
+        android:text="@string/remove_message_received_handler" />
 
   </LinearLayout>
 
