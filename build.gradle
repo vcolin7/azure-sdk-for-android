@@ -10,18 +10,14 @@ buildscript {
     }
 
     ext {
-        // Updating the dependency below throws a 'java.lang.OutOfMemoryError: Metaspace' during build time.
-        googleGmsServicesPluginVersion = "4.3.8"
+        googleGmsServicesPluginVersion = "4.3.8" // Updating this dependency throws a 'java.lang.OutOfMemoryError: Metaspace' during build time.
         gradleAndroidBuildToolsPluginVersion = "30.0.3"
-        // Need to make many changes before being able to update the gradle plugin version below.
-        gradleAndroidToolsPluginVersion = "4.0.2"
+        gradleAndroidToolsPluginVersion = "4.0.2" // Need to make many changes before being able to update the gradle plugin version.
         gradleJunitJacocoPluginVersion = "0.16.0"
         gradleDexcountPluginVersion = "3.0.0"
         gradleSpotbugsPluginVersion = "4.7.5"
         gradleAndroidJunit5PluginVersion = "1.8.0.0"
-        jacocoVersion = "0.8.7"
-        // Updating the dependency below causes a ClassDefNotFound exception with the current CheckStyle implementation
-        // in the /eng/ directory.
+        jacocoVersion = "0.8.7" // Updating this dependency below causes a ClassDefNotFound exception with the current CheckStyle implementation in the /eng/ directory.
         qualityReportsPuppycrawlVersion = "8.34"
         qualityReportsJunitVersion = "4.13.2"
     }
@@ -132,7 +128,7 @@ configure(subprojects.findAll { it.path.startsWith(':sdk:') && it.path.count(':'
     }
 
     task checkstyle(type: Checkstyle) {
-        project.ext.checkstyleVersion = '8.29'
+        project.ext.checkstyleVersion = '8.34'
         description 'Runs Checkstyle inspection.'
         group = 'Code Quality'
         configDirectory = file("${rootDir}/config/checkstyle")
@@ -149,9 +145,9 @@ configure(subprojects.findAll { it.path.startsWith(':sdk:') && it.path.count(':'
         check.dependsOn('checkstyle')
     }
 
-    // Set spotbugs plugin to use SpotBugs.
+    // Set spotbugs plugin to use SpotBugs. You can get the matching version from here: https://github.com/spotbugs/spotbugs-gradle-plugin#spotbugs-version-mapping
     dependencies {
-        spotbugs 'com.github.spotbugs:spotbugs:4.0.0'
+        spotbugs 'com.github.spotbugs:spotbugs:4.4.1'
     }
 
     spotbugs {
@@ -260,21 +256,22 @@ allprojects {
     }
 
     ext {
-        androidxTestVersion = "1.4.0"
-        appCompatVersion = "1.2.0"
+        androidxTestRulesVersion = "1.5.0"
+        androidxTestRunnerVersion = "1.5.2"
         azureCommunicationCommonVersion = "2.0.0-beta.1"
         azureCoreVersion = "1.0.0-beta.12"
         jacksonVersion = "2.12.7" // Do not upgrade to 2.13.0 and above, as it introduced using an API not available in javax.xml.stream:stax-api:1.0-2. See: https://github.com/Azure/azure-sdk-for-android/issues/1017
-        jacksonDatabindVersion = "2.12.7.1" // Need this to be a separate version to include a security fix.
+        jacksonDatabindVersion = "2.12.7.1" // Need this to be a separate version to include a security fix. Do not upgrade to 2.13.0 and above.
         junitJupiterVersion = "5.7.2"
-        mockitoVersion = "4.0.0"
+        mockitoVersion = "4.0.0" // TODO: Check if we can upgrade to 5.x+
         nimbusJoseJwtTestVersion = "9.15.2"
         okHttpVersion = "3.14.9" // Do not upgrade, newer versions require a higher Android minSdkLevel
         orgtestngVersion = "7.4.0"
         powerMockVersion = "2.0.9"
         retroFutureVersion = "1.7.4"
         staxApiVersion = "1.0-2" // Need this instead of using the JDK due to: https://stackoverflow.com/a/47371517/1473510
-        slf4jApiVersion = "1.7.32"
+        slf4jApiVersion = "1.7.32" // TODO: Check if we can upgrade to 2.x+
+        testNgVersion = "7.7.1"
         threeTenAbpVersion = "1.3.1"
         threeTenBpVersion = "1.5.1"
         trouterVersion = "0.1.1"

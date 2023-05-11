@@ -30,7 +30,7 @@ dependencies {
     implementation "com.fasterxml.woodstox:woodstox-core:$woodstoxVersion"
     implementation "com.github.tomakehurst:wiremock-standalone:$wireMockVersion" // For 'HttpClientTestsWireMockServer'
     implementation "org.junit.jupiter:junit-jupiter-api:$junitJupiterVersion" // For 'AzureTestWatcher'
-    implementation "org.testng:testng:$orgtestngVersion"
+    implementation "org.testng:testng:$testNgVersion"
     // <!-- end: implementation Dependencies -->
 
     // <!-- begin: test Dependencies -->

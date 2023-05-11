@@ -64,7 +64,11 @@
       <Package name="android.util"/>
       <Package name="com.azure.android.core.test"/>
       <Package name="com.azure.android.core.test.implementation"/>
+      <Package name="com.azure.android.core.test.implementation.entities"/>
       <Package name="com.azure.android.core.test.http"/>
+      <Package name="com.azure.android.core.test.models"/>
+      <Package name="com.azure.android.core.test.policy"/>
+      <Package name="com.azure.android.core.test.utils"/>
     </Or>
     <Bug pattern="DM_BOXED_PRIMITIVE_FOR_PARSING,
                   DM_CONVERT_CASE,
@@ -78,7 +82,10 @@
                   RV_RETURN_VALUE_IGNORED,
                   SIC_INNER_SHOULD_BE_STATIC_ANON,
                   SE_NO_SERIALVERSIONID,
-                  RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+                  RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE,
+                  EI_EXPOSE_REP,
+                  EI_EXPOSE_REP2,
+                  DMI_RANDOM_USED_ONLY_ONCE"/>
   </Match>
 
   <!-- FIXME: spotbugs issues in core test packages -->
@@ -159,6 +166,50 @@
       <Class name="~com\.azure\.(.+)Impl"/>
     </Or>
     <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE"/>
+  </Match>
+
+  <!-- Returning a new copy of the object is not necessary. -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP"/>
+    <Or>
+      <Class name="com.azure.android.core.credential.AccessToken"/>
+      <Class name="com.azure.android.core.credential.TokenRequestContext"/>
+      <Class name="com.azure.android.core.http.policy.FixedDelay"/>
+      <Class name="com.azure.android.core.http.policy.HttpLogOptions"/>
+      <Class name="com.azure.android.core.http.util.UrlBuilder"/>
+      <Class name="com.azure.android.core.rest.ResponseBase"/>
+      <Class name="com.azure.android.core.rest.SimpleResponse"/>
+      <Class name="com.azure.android.core.rest.util.paging.PagedResponseBase"/>
+      <Class name="com.azure.android.core.util.DateTimeRfc1123"/>
+      <Class name="com.azure.android.core.util.UnixTime"/>
+    </Or>
+  </Match>
+
+  <!-- Copying a the provided object constructing is not necessary. -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Or>
+      <Class name="com.azure.android.core.credential.AccessToken"/>
+      <Class name="com.azure.android.core.http.httpurlconnection.HttpUrlConnectionAsyncHttpClientBuilder"/>
+      <Class name="com.azure.android.core.http.policy.AddHeadersPolicy"/>
+      <Class name="com.azure.android.core.http.policy.ExponentialBackoff"/>
+      <Class name="com.azure.android.core.rest.ResponseBase"/>
+      <Class name="com.azure.android.core.rest.SimpleResponse"/>
+      <Class name="com.azure.android.core.rest.util.paging.PagedAsyncStream"/>
+      <Class name="com.azure.android.core.rest.util.paging.PagedIterable"/>
+      <Class name="com.azure.android.core.rest.util.paging.PagedResponseBase"/>
+      <Class name="com.azure.android.core.util.DateTimeRfc1123"/>
+      <Class name="com.azure.android.core.util.UnixTime"/>
+    </Or>
+  </Match>
+
+  <!-- Using a random object only once is intended. -->
+  <Match>
+    <Bug pattern="DMI_RANDOM_USED_ONLY_ONCE"/>
+    <Or>
+      <Class name="com.azure.android.core.http.policy.ExponentialBackoff"/>
+      <Class name="com.azure.android.core.http.util.AuthorizationChallengeHandler"/>
+    </Or>
   </Match>
 
 </FindBugsFilter>
